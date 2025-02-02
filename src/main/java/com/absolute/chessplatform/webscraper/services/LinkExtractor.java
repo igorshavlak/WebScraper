@@ -27,25 +27,20 @@ public class LinkExtractor {
         }
         return links;
     }
-
-    public static Set<String> extractImages(Document document) throws URISyntaxException, IOException {
+    public static Set<String> extractImages(Document document)  {
         Set<String> imagesLinks = new HashSet<>();
         Elements images = document.select("img[src]");
         for (Element element : images) {
-            String link = element.attr("abs:src");
-            Connection.Response response = Jsoup.connect(link)
-                    .ignoreContentType(true)
-                    .execute();
-            byte[] image = response.bodyAsBytes();
-            if(image.length > 200 * 1024) {
-                imagesLinks.add(link);
-            }
+           imagesLinks.add(element.attr("abs:src"));
         }
         return imagesLinks;
     }
 
     public static boolean isLinkRefersToDomain(String url, String domain) throws URISyntaxException {
         String host = new URI(url).getHost();
+        if (host == null) {
+            return false;
+        }
         return host.equalsIgnoreCase(domain);
     }
 }
