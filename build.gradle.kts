@@ -27,12 +27,14 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework:spring-webflux:6.2.1")
+    implementation ("com.github.crawler-commons:crawler-commons:1.4")
     compileOnly("org.projectlombok:lombok")
     runtimeOnly("org.postgresql:postgresql")
     annotationProcessor("org.projectlombok:lombok")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation("org.jsoup:jsoup:1.18.3")
+
 }
 
 tasks.withType<Test> {

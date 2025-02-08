@@ -3,15 +3,12 @@ package com.absolute.chessplatform.webscraper.controllers;
 import com.absolute.chessplatform.webscraper.entities.ScraperBody;
 import com.absolute.chessplatform.webscraper.services.ScraperService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import java.io.IOException;
 import java.net.URISyntaxException;
-import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequiredArgsConstructor
@@ -20,15 +17,19 @@ public class ScraperController {
 
     private final ScraperService scraperService;
 
-    @GetMapping("/start")
-    private ResponseEntity<?> startScraping(@RequestBody ScraperBody scraperBody) throws IOException, URISyntaxException {
-        if(scraperBody == null) {
-            return ResponseEntity.badRequest().body("No scraper body found");
+    @PostMapping("/start")
+    public CompletableFuture<ResponseEntity<?>> startScraping(@RequestBody ScraperBody scraperBody) throws URISyntaxException {
+        if (scraperBody == null) {
+            return CompletableFuture.completedFuture(ResponseEntity.badRequest().body("No scraper body found"));
         }
-        Set<String> links = scraperService.startScraping(scraperBody.getUrl(),scraperBody.getRecursionDepth());
-        if(links.isEmpty()) {
-            return ResponseEntity.badRequest().body("No links found");
-        }
-        return ResponseEntity.ok(links);
+
+        return scraperService.startScraping(scraperBody.getUrl(), scraperBody.getRecursionDepth())
+                .thenApply(result -> {
+                    if (result.isEmpty()) {
+                        return ResponseEntity.status(HttpStatus.NO_CONTENT).body("Не знайдено посилань");
+                    }
+                    return ResponseEntity.ok(result);
+                })
+                .exceptionally(ex -> ResponseEntity.internalServerError().body("Помилка обробки: " + ex.getMessage()));
     }
 }

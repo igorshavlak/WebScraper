@@ -1,3 +1,6 @@
+crawler:
+  linkPoolSize: 10
+  imagePoolSize: 5
 spring:
   application:
     name: WebScraper

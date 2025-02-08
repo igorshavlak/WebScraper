@@ -1,14 +1,11 @@
 package com.absolute.chessplatform.webscraper.services;
 
 import lombok.extern.slf4j.Slf4j;
-import org.jsoup.Connection;
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashSet;
@@ -36,11 +33,12 @@ public class LinkExtractor {
         return imagesLinks;
     }
 
-    public static boolean isLinkRefersToDomain(String url, String domain) throws URISyntaxException {
-        String host = new URI(url).getHost();
-        if (host == null) {
+    public static boolean isLinkRefersToDomain(String url, String domain)   {
+        try {
+            String host = new URI(url).getHost();
+            return host != null && (host.equalsIgnoreCase(domain) || host.endsWith("." + domain));
+        } catch (URISyntaxException e) {
             return false;
         }
-        return host.equalsIgnoreCase(domain);
     }
 }

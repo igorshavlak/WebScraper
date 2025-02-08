@@ -1,19 +1,21 @@
 package com.absolute.chessplatform.webscraper.entities;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 @Entity
-@Getter
-@Setter
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class ImageEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private int id;
-    @Column(unique=true)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private long id;
+    @Column(name = "original_url", unique = true)
     private String originalUrl;
     private String path;
-    private String originalSize;
-    private String sizeAfterCompression;
+    @Column(name = "original_size")
+    private long originalSize;
+    @Column(name = "size_after_compression")
+    private long sizeAfterCompression;
 }
