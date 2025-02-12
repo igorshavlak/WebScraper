@@ -4,8 +4,9 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7"
 }
 
-group = "com.absolute.chessplatform"
+group = "com.webscraper"
 version = "0.0.1-SNAPSHOT"
+
 
 java {
     toolchain {
@@ -27,6 +28,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework:spring-webflux:6.2.1")
+    implementation("com.twelvemonkeys.imageio:imageio-webp:3.12.0")
+    implementation("org.apache.httpcomponents.client5:httpclient5:5.4.2")
     implementation ("com.github.crawler-commons:crawler-commons:1.4")
     compileOnly("org.projectlombok:lombok")
     runtimeOnly("org.postgresql:postgresql")
