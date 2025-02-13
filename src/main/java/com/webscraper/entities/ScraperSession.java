@@ -3,9 +3,12 @@ package com.webscraper.entities;
 import crawlercommons.robots.BaseRobotRules;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Getter
 @Setter
@@ -14,7 +17,7 @@ public class ScraperSession {
     private String domain;
     private int maxDepth;
     private BaseRobotRules robotsTxtRules;
-    private Set<String> visited = new HashSet<>();
+    private Set<String> visited = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private Long userDelay;
     private List<ProxyInfo> userProxies;

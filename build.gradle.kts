@@ -29,6 +29,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework:spring-webflux:6.2.1")
     implementation("com.twelvemonkeys.imageio:imageio-webp:3.12.0")
+    implementation("org.springframework.retry:spring-retry:2.0.11")
     implementation("org.apache.httpcomponents.client5:httpclient5:5.4.2")
     implementation ("com.github.crawler-commons:crawler-commons:1.4")
     compileOnly("org.projectlombok:lombok")

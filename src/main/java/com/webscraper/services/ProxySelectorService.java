@@ -1,5 +1,11 @@
 package com.webscraper.services;
-//
-//@Service
-//public class ProxySelectorService {
-//}
+
+
+import com.webscraper.entities.ProxyInfo;
+
+import java.util.List;
+
+public interface ProxySelectorService {
+
+    ProxyInfo selectProxy(List<ProxyInfo> proxies);
+}

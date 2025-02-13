@@ -3,19 +3,24 @@ package com.webscraper.services;
 import com.webscraper.entities.ProxyInfo;
 import com.webscraper.entities.ScraperSession;
 import com.webscraper.providers.ProxyProvider;
+import com.webscraper.utils.LinkExtractor;
+import com.webscraper.utils.ProxyCheckerService;
 import com.webscraper.utils.URLUtils;
 import crawlercommons.robots.BaseRobotRules;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.hc.core5.net.URIBuilder;
+import org.apache.catalina.util.RateLimiter;
 import org.jsoup.nodes.Document;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -24,20 +29,20 @@ public class ScraperService {
     private final ExecutorService linkExecutor;
     private final ExecutorService imageExecutor;
     private final RobotsTxtService robotsTxtService;
-    private final ProxyProvider proxyProvider;
+    private final ProxySelectorService proxySelectorService;
     private final DocumentService documentService;
 
     public ScraperService(ImageProcessingService imageProcessingService,
                           @Qualifier("linkExecutor") ExecutorService linkExecutor,
                           @Qualifier("imageExecutor") ExecutorService imageExecutor,
-                          ProxyProvider proxyProvider,
+                          ProxySelectorService proxySelectorService,
                           RobotsTxtService robotsTxtService,
                           DocumentService documentService) {
         this.linkExecutor = linkExecutor;
         this.imageExecutor = imageExecutor;
         this.robotsTxtService = robotsTxtService;
         this.imageProcessingService = imageProcessingService;
-        this.proxyProvider = proxyProvider;
+        this.proxySelectorService = proxySelectorService;
         this.documentService = documentService;
     }
 
@@ -51,6 +56,7 @@ public class ScraperService {
             log.info("Crawl-delay (з Robots.txt): {}", crawlDelay);
             log.info("Crawl-delay (з сесії): {}", rules.getCrawlDelay());
         }
+        userProxies = ProxyCheckerService.filterWorkingProxies(userProxies);
         ScraperSession session = new ScraperSession(url, domain, maxDepth, rules, userDelay, userProxies);
 
         CompletableFuture<Void> crawlingFuture = crawl(session.getUrl(), session, 0);
@@ -70,37 +76,37 @@ public class ScraperService {
         }
         log.info("Скрапінг URL: {} на глибині {}", normalizedUrl, currentDepth);
 
-        // Визначення затримки: якщо в robots.txt є crawl-delay, використовуємо його, інакше – користувацьку затримку
         long sleepTime = 0;
         if (session.getRobotsTxtRules() != null && session.getRobotsTxtRules().getCrawlDelay() > 0) {
             sleepTime = session.getRobotsTxtRules().getCrawlDelay();
         } else if (session.getUserDelay() != null && session.getUserDelay() > 0) {
             sleepTime = session.getUserDelay();
         }
+
+
         if (sleepTime > 0) {
             try {
-                Thread.sleep(sleepTime);
+                Thread.sleep(2);
             } catch (InterruptedException e) {
                 log.error("Помилка при затримці: {}", e.getMessage());
                 Thread.currentThread().interrupt();
             }
         }
 
-        ProxyInfo proxy;
-        if (session.getUserProxies() != null && !session.getUserProxies().isEmpty()) {
-            // Для простоти – використовуємо перший proxy із списку. Можна реалізувати round-robin або випадковий вибір.
-            proxy = session.getUserProxies().getFirst();
-        } else {
-            proxy = null;
-        }
-
-        return CompletableFuture.supplyAsync(() -> documentService.fetchDocument(normalizedUrl, proxy), linkExecutor)
+        return CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return documentService.fetchDocument(normalizedUrl, proxySelectorService.selectProxy(session.getUserProxies()));
+                    } catch (IOException e) {
+                        throw new CompletionException(e);
+                    }
+                }, linkExecutor)
                 .thenCompose(document -> processDocument(document, session, currentDepth))
                 .exceptionally(ex -> {
                     log.error("Помилка обробки URL: {}. Помилка: {}", normalizedUrl, ex.getMessage());
                     return null;
                 });
     }
+
 
     private CompletableFuture<Void> processDocument(Document doc, ScraperSession session, int currentDepth) {
         if (doc == null) return CompletableFuture.completedFuture(null);
@@ -109,6 +115,7 @@ public class ScraperService {
         Set<String> images = new HashSet<>();
         images.addAll(LinkExtractor.extractImages(doc));
         images.addAll(LinkExtractor.extractCssImages(doc));
+        images.addAll(LinkExtractor.extractAnchorImageLinks(doc));
 
         List<CompletableFuture<Void>> linkFutures = new ArrayList<>();
         List<CompletableFuture<Void>> imageFutures = new ArrayList<>();
@@ -133,13 +140,7 @@ public class ScraperService {
         return CompletableFuture.allOf(allFutures.toArray(new CompletableFuture[0]));
     }
 
-    /**
-     * Перевіряє, чи слід обробляти URL:
-     * - Перевіряє максимальну глибину,
-     * - Чи URL належить заданому домену,
-     * - Чи дозволено обробку за правилами robots.txt,
-     * - І чи URL ще не був відвіданий.
-     */
+
     private boolean shouldProcess(String url, ScraperSession session, int currentDepth) {
         if (currentDepth > session.getMaxDepth()) {
             return false;

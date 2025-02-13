@@ -1,10 +1,9 @@
-package com.webscraper.services;
+package com.webscraper.utils;
 
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -22,7 +21,10 @@ public class LinkExtractor {
         Set<String> links = new HashSet<>();
         Elements linkElements = document.select("a[href]");
         for (Element element : linkElements) {
-            links.add(element.attr("abs:href"));
+            String href = element.attr("abs:href");
+            if (!href.matches("(?i).*\\.(png|jpg|jpeg|gif|bmp)(\\?.*)?$")) {
+                links.add(href);
+            }
         }
         return links;
     }
@@ -64,6 +66,18 @@ public class LinkExtractor {
             }
         }
         return cssImages;
+    }
+    public static Set<String> extractAnchorImageLinks(Document document) {
+        Set<String> imageLinks = new HashSet<>();
+        Elements anchorElements = document.select("a[href]");
+        for (Element element : anchorElements) {
+            String href = element.attr("abs:href");
+
+            if (href.matches("(?i).*\\.(png|jpg|jpeg|gif|bmp)(\\?.*)?$")) {
+                imageLinks.add(href);
+            }
+        }
+        return imageLinks;
     }
     private static String resolveUrl(String baseUri, String imageUrl) {
         if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
