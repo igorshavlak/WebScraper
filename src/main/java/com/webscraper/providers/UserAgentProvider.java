@@ -6,6 +6,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
+/**
+ * Utility service that provides random User-Agent strings.
+ */
 @Service
 public class UserAgentProvider {
     private static final List<String> USER_AGENTS = Arrays.asList(
@@ -23,6 +26,11 @@ public class UserAgentProvider {
     );
     private static final Random RANDOM = new Random();
 
+    /**
+     * Returns a random User-Agent string from the predefined list.
+     *
+     * @return a random User-Agent string
+     */
     public static String getRandomUserAgent() {
         int index = RANDOM.nextInt(USER_AGENTS.size());
         return USER_AGENTS.get(index);

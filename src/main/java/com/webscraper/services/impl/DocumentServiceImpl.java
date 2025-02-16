@@ -13,13 +13,27 @@ import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
+
 import java.io.IOException;
 import java.net.SocketException;
 
+/**
+ * Implementation of {@link DocumentService} for fetching HTML documents using JSoup.
+ */
 @Slf4j
 @Service
 public class DocumentServiceImpl implements DocumentService {
 
+    /**
+     * Fetches the document from the given URL using the provided proxy.
+     * <p>
+     * This method is retryable in case of IO, Socket, or HTTP status exceptions.
+     *
+     * @param url   the URL to fetch
+     * @param proxy the proxy information; may be null
+     * @return the fetched JSoup Document
+     * @throws IOException if fetching fails after retries
+     */
     @Retryable(
             value = { IOException.class, SocketException.class, HttpStatusException.class },
             maxAttempts = 4,
@@ -30,6 +44,14 @@ public class DocumentServiceImpl implements DocumentService {
         return tryFetch(url, proxy);
     }
 
+    /**
+     * Attempts to fetch the document and handles specific HTTP status exceptions.
+     *
+     * @param url   the URL to fetch
+     * @param proxy the proxy information; may be null
+     * @return the fetched JSoup Document
+     * @throws IOException if an error occurs during fetching
+     */
     private Document tryFetch(String url, ProxyInfo proxy) throws IOException {
         try {
             Connection connection = createConnection(url, proxy);
@@ -53,6 +75,13 @@ public class DocumentServiceImpl implements DocumentService {
         }
     }
 
+    /**
+     * Creates a JSoup connection for the given URL with the appropriate headers and proxy settings.
+     *
+     * @param url   the URL to connect to
+     * @param proxy the proxy information; may be null
+     * @return the JSoup {@link Connection} instance
+     */
     private Connection createConnection(String url, ProxyInfo proxy) {
         String userAgent = UserAgentProvider.getRandomUserAgent();
         Connection connection = Jsoup.connect(url)
@@ -66,6 +95,14 @@ public class DocumentServiceImpl implements DocumentService {
         return connection;
     }
 
+    /**
+     * Recovery method for fetchDocument after all retries have been exhausted.
+     *
+     * @param e     the exception encountered during fetching
+     * @param url   the URL that was being fetched
+     * @param proxy the proxy information used
+     * @return null, indicating that the document could not be fetched
+     */
     @Recover
     public Document recover(IOException e, String url, ProxyInfo proxy) {
         log.error("Failed to fetch document from URL {} after retries: {}", url, e.getMessage());

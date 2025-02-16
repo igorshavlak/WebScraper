@@ -22,49 +22,58 @@ import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.UUID;
 
+/**
+ * Service for compressing JPEG images.
+ */
 @Service
 @Slf4j
 public class JpegCompressor {
 
-    // Початкове значення якості (можна задавати через application.properties)
+    /**
+     * Initial quality setting (configurable via application.properties).
+     */
     @Value("${jpeg.compression.quality:0.8}")
     private float initialQuality;
 
-    // Кількість ітерацій пошуку та допустима похибка (відносна різниця)
     private static final int MAX_ITERATIONS = 10;
     private static final double TOLERANCE = 0.05; // 5%
 
+    /**
+     * Compresses the provided image bytes and saves the result to the output directory.
+     *
+     * @param imageBytes      the original image bytes
+     * @param outputDirectory the directory where the compressed image will be saved
+     * @return a CompressionResult containing the compressed size and file link
+     * @throws IOException if an I/O error occurs or the image cannot be processed
+     */
     public CompressionResult compressAndSave(byte[] imageBytes, Path outputDirectory) throws IOException {
         if (imageBytes == null || imageBytes.length == 0) {
-            throw new IOException("Отримано порожній масив байтів.");
+            throw new IOException("Received an empty byte array.");
         }
-        log.debug("Отримано зображення розміром: {} байтів.", imageBytes.length);
+        log.debug("Original image size: {} bytes.", imageBytes.length);
 
         BufferedImage bufferedImage = decodeImage(imageBytes);
         if (bufferedImage == null) {
-            throw new IOException("Не вдалося декодувати зображення.");
+            throw new IOException("Failed to decode image.");
         }
 
-        // Переконуємося, що зображення має формат RGB
+        // Ensure image is in RGB format
         if (bufferedImage.getType() != BufferedImage.TYPE_INT_RGB) {
-            BufferedImage rgbImage = new BufferedImage(
-                    bufferedImage.getWidth(),
-                    bufferedImage.getHeight(),
-                    BufferedImage.TYPE_INT_RGB);
+            BufferedImage rgbImage = new BufferedImage(bufferedImage.getWidth(), bufferedImage.getHeight(), BufferedImage.TYPE_INT_RGB);
             Graphics2D graphics = rgbImage.createGraphics();
             graphics.drawImage(bufferedImage, 0, 0, null);
             graphics.dispose();
             bufferedImage = rgbImage;
         }
 
-        // Цільовий розмір файлу – вдвічі менше за розмір вхідного масиву байтів
+        // Target file size: half of the original
         long targetSize = imageBytes.length / 2;
-        log.debug("Цільовий розмір файлу: {} байтів", targetSize);
+        log.debug("Target file size: {} bytes", targetSize);
 
-        // Знаходимо оптимальне значення якості, яке дасть бажаний розмір файлу
+        // Find the optimal quality to meet the target size
         float optimalQuality = findOptimalQuality(bufferedImage, targetSize);
 
-        // Генеруємо унікальне ім'я файлу за допомогою UUID
+        // Generate a unique filename using UUID
         String outputFileName = UUID.randomUUID().toString() + ".jpg";
         Path outputPath = outputDirectory.resolve(outputFileName);
 
@@ -72,27 +81,28 @@ public class JpegCompressor {
             compressJpeg(bufferedImage, os, optimalQuality);
         }
         long compressedSize = Files.size(outputPath);
-        log.info("Остаточний розмір файлу: {} байтів при якості: {}", compressedSize, optimalQuality);
+        log.info("Final file size: {} bytes at quality: {}", compressedSize, optimalQuality);
         return new CompressionResult(compressedSize, outputPath.toString());
     }
 
     /**
-     * Метод виконує бінарний пошук по значенню якості JPEG,
-     * щоб отримати результат із розміром файлу приблизно рівним targetSize.
+     * Uses a binary search to determine the optimal JPEG quality setting that produces a file close to the target size.
+     *
+     * @param image      the BufferedImage to compress
+     * @param targetSize the desired file size in bytes
+     * @return the optimal quality factor (between 0.0 and 1.0)
+     * @throws IOException if an error occurs during compression
      */
     private float findOptimalQuality(BufferedImage image, long targetSize) throws IOException {
         float low = 0.0f;
         float high = 1.0f;
-        float bestQuality = initialQuality; // Початкове припущення
+        float bestQuality = initialQuality;
 
-        // Перевірка: якщо при максимальній якості отриманий розмір уже менший за цільовий,
-        // то повертаємо максимальну якість.
         byte[] maxQualityBytes = compressJpegToByteArray(image, 1.0f);
         if (maxQualityBytes.length <= targetSize) {
             return 1.0f;
         }
-        // Аналогічно: якщо при мінімальній якості розмір все одно перевищує цільовий,
-        // повертаємо мінімальну якість.
+
         byte[] minQualityBytes = compressJpegToByteArray(image, 0.0f);
         if (minQualityBytes.length > targetSize) {
             return 0.0f;
@@ -102,19 +112,15 @@ public class JpegCompressor {
             float mid = (low + high) / 2.0f;
             byte[] compressedBytes = compressJpegToByteArray(image, mid);
             int size = compressedBytes.length;
-            log.debug("Ітерація {}: якість = {}, розмір = {}", i, mid, size);
+            log.debug("Iteration {}: quality = {}, size = {}", i, mid, size);
 
-            // Якщо отриманий розмір близький до цільового (в межах TOLERANCE),
-            // вважаємо, що знайшли оптимальну якість.
             if (Math.abs(size - targetSize) < targetSize * TOLERANCE) {
                 bestQuality = mid;
                 break;
             }
             if (size > targetSize) {
-                // Якщо розмір файлу перевищує ціль, зменшуємо якість.
                 high = mid;
             } else {
-                // Якщо розмір файлу менший за ціль, збільшуємо якість.
                 low = mid;
             }
             bestQuality = mid;
@@ -123,7 +129,12 @@ public class JpegCompressor {
     }
 
     /**
-     * Стискає зображення із заданою якістю у масив байтів.
+     * Compresses the given image to a JPEG byte array with the specified quality.
+     *
+     * @param image   the image to compress
+     * @param quality the JPEG quality (0.0 to 1.0)
+     * @return the compressed image as a byte array
+     * @throws IOException if an error occurs during compression
      */
     private byte[] compressJpegToByteArray(BufferedImage image, float quality) throws IOException {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
@@ -132,6 +143,13 @@ public class JpegCompressor {
         }
     }
 
+    /**
+     * Decodes the image from the provided byte array. Supports JPEG and attempts WebP if needed.
+     *
+     * @param imageBytes the raw image bytes
+     * @return the decoded BufferedImage, or null if decoding fails
+     * @throws IOException if an error occurs during reading
+     */
     private BufferedImage decodeImage(byte[] imageBytes) throws IOException {
         BufferedImage img;
         try (ByteArrayInputStream bais = new ByteArrayInputStream(imageBytes)) {
@@ -141,30 +159,48 @@ public class JpegCompressor {
             return img;
         }
         if (isWebP(imageBytes)) {
-            log.info("Виявлено формат WebP. Спроба декодувати зображення WebP.");
+            log.info("WebP format detected. Attempting to decode WebP image.");
             return decodeWebP(imageBytes);
         }
         return null;
     }
 
+    /**
+     * Checks if the provided bytes represent a WebP image.
+     *
+     * @param imageBytes the image bytes
+     * @return true if the image is WebP; false otherwise
+     */
     private boolean isWebP(byte[] imageBytes) {
         if (imageBytes.length < 12) return false;
         String header = new String(imageBytes, 0, 12, StandardCharsets.US_ASCII);
         return header.startsWith("RIFF") && header.substring(8, 12).equals("WEBP");
     }
 
+    /**
+     * Attempts to decode a WebP image.
+     *
+     * @param imageBytes the image bytes
+     * @return the decoded BufferedImage, or null if decoding fails
+     * @throws IOException if an error occurs during reading
+     */
     private BufferedImage decodeWebP(byte[] imageBytes) throws IOException {
         try (ByteArrayInputStream bais = new ByteArrayInputStream(imageBytes)) {
             BufferedImage img = ImageIO.read(bais);
             if (img == null) {
-                log.error("Не вдалося декодувати WebP зображення. Переконайтеся, що підключено відповідний плагін.");
+                log.error("Failed to decode WebP image. Ensure the appropriate plugin is installed.");
             }
             return img;
         }
     }
 
     /**
-     * Стискає BufferedImage у JPEG і записує результат в OutputStream.
+     * Compresses the BufferedImage as a JPEG and writes it to the provided OutputStream.
+     *
+     * @param image   the image to compress
+     * @param os      the output stream to write the compressed image
+     * @param quality the JPEG quality (0.0 to 1.0)
+     * @throws IOException if an error occurs during writing
      */
     private void compressJpeg(BufferedImage image, OutputStream os, float quality) throws IOException {
         Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");

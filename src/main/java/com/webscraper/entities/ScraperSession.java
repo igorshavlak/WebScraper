@@ -1,23 +1,33 @@
 package com.webscraper.entities;
 
+import com.google.common.util.concurrent.RateLimiter;
 import crawlercommons.robots.BaseRobotRules;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+
+/**
+ * Represents the state of a scraping session, including visited URLs, proxy settings, and crawling limits.
+ */
 @Getter
 @Setter
 public class ScraperSession {
+
     private String url;
     private String domain;
     private int maxDepth;
+
     private BaseRobotRules robotsTxtRules;
-    private Set<String> visited = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private RateLimiter rateLimiter;
+
+    private Set<String> visitedLinksUrl = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private Set<String> visitedImagesUrl = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
 
     private Long userDelay;
     private List<ProxyInfo> userProxies;

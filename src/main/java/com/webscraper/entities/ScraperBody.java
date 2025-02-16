@@ -5,10 +5,15 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.util.List;
 
+
+/**
+ * POJO representing the request body for a scraping task.
+ */
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 public class ScraperBody {
+
     private String title;
     private String url;
     private int recursionDepth;
